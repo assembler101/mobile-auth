@@ -9,7 +9,15 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.properties import ObjectProperty
 
 import sqlite3
+import regex
 from argon2 import PasswordHasher
+
+# escapes all single quotes to prevent SQL injections. (sqlite)
+# assumes that strings are wrapped around in single quotes
+def escapeSingleQuotes(string):
+    escape_re = regex.compile(r'(?=\')')
+
+    return regex.sub(escape_re, r'\'', string)
 
 class UserSignUp(BoxLayout):
     def __init__(self, **kwargs):
@@ -22,13 +30,18 @@ class UserSignUp(BoxLayout):
         table_name = 'users'
         ph = PasswordHasher()
 
+        # prevent SQL injection
+        username = escapeSingleQuotes(username)
+
         hashed_password = ph.hash(password)
 
-        # save the user credentials
-        self.cursor.execute('''
+        query = '''
             INSERT INTO %s(username, password)
             VALUES('%s', '%s')
-        ''' % (table_name, username, hashed_password))
+        ''' % (table_name, username, hashed_password)
+
+        # save the user credentials
+        self.cursor.execute(query)
 
         self.conn.commit()
 
@@ -43,9 +56,6 @@ class AuthApp(App):
         auth = Auth()
 
         return auth
-
-    def on_stop():
-        print('closed connection')
 
 if __name__ == '__main__':
     AuthApp().run()
